@@ -1,0 +1,27 @@
+
+- Tester.java 对参数设置的重复
+
+- 删除对 Resource_Local 的使用，都用 Resource
+
+- fix handle separator in convertToRSSet
+         //first,replace separator to the system designated separator
+        //Use Pattern.quote to treat the separator as literal string, not regex
+        //first,replace separator to the system designated separator
+
+        if(separator.equals("both"))
+            buffer.append(rsText.replaceAll(RESULT.COLUMN_SEPARATOR_SPACE,RESULT.COLUMN_SEPARATOR_SYSTEM).replaceAll(RESULT.COLUMN_SEPARATOR_TABLE,RESULT.COLUMN_SEPARATOR_SYSTEM));
+        if(separator.equals("table"))
+            buffer.append(rsText.replaceAll(RESULT.COLUMN_SEPARATOR_TABLE,RESULT.COLUMN_SEPARATOR_SYSTEM));
+        if(separator.equals("space"))
+            buffer.append(rsText.replaceAll(RESULT.COLUMN_SEPARATOR_SPACE,RESULT.COLUMN_SEPARATOR_SYSTEM));
+        RSSet rsSet = new RSSet();
+
+        /// 
+        rsSet.addRow(rsRow);
+        String[] values = rowline.split(RESULT.COLUMN_SEPARATOR_SYSTEM);
+
+        Reference: https://github.com/matrixorigin/mo-tester/pull/182
+
+- fix error compare
+
+    if(!this.errorMessage.trim().equals(stmtResult.getErrorMessage().trim())){

@@ -6,9 +6,6 @@ import io.mo.constant.COMMON;
 import io.mo.constant.RESULT;
 import io.mo.result.RSSet;
 import io.mo.result.StmtResult;
-import io.mo.stream.KafkaManager;
-import io.mo.stream.Producer;
-import io.mo.stream.TopicAndRecords;
 import io.mo.util.MoConfUtil;
 import io.mo.util.ResultParser;
 import org.apache.log4j.Logger;
@@ -66,15 +63,6 @@ public class Executor {
         //for (SqlCommand command : commands) {
         for(int i = 0; i < commands.size(); i++){
             SqlCommand command = commands.get(i);
-            
-            //if related to kafka stream record
-            
-            if(script.isKafkaProduceCmd(i)){
-                Producer producer = KafkaManager.getProducer();
-                TopicAndRecords tar = script.getTopicAndRecord(i);
-                producer.send(tar);
-                LOG.info(String.format("Succeed to send the following messages to kafka server and topic[%s]:\n%s",tar.getTopic(),tar.getRecordsStr()));
-            }
             
             //if need to sleep 
             if(command.getSleeptime() > 0){
@@ -137,9 +125,18 @@ public class Executor {
                 //connection.setCatalog(command.getUseDB());
                 command.setUseDB(connection.getCatalog());
                 statement = connection.createStatement();
-                String sqlCmd = command.getCommand()
-                        .replaceAll(COMMON.RESOURCE_LOCAL_PATH_FLAG,COMMON.RESOURCE_LOCAL_PATH)
-                        .replaceAll(COMMON.RESOURCE_PATH_FLAG,COMMON.RESOURCE_PATH);
+                String cmd = command.getCommand();
+                if(cmd == null || cmd.trim().isEmpty()){
+                    LOG.warn("[" + script.getFileName() + "][row:" + command.getPosition() + "] Command is empty, skip it.");
+                    script.addIgnoredCmd(command);
+                    command.getTestResult().setResult(RESULT.RESULT_TYPE_IGNORED);
+                    command.getTestResult().setErrorCode(RESULT.ERROR_CASE_IGNORE_CODE);
+                    command.getTestResult().setErrorDesc("Empty command");
+                    continue;
+                }
+                String sqlCmd = cmd
+                        .replaceAll(COMMON.RESOURCE_LOCAL_PATH_FLAG, COMMON.RESOURCE_LOCAL_PATH)
+                        .replaceAll(COMMON.RESOURCE_PATH_FLAG, COMMON.RESOURCE_PATH);
                 if(command.isNeedWait()){
                     execWaitOperation(command);
                 }
@@ -344,13 +341,6 @@ public class Executor {
                 try{
                     command = commands.get(j);
 
-                    if(script.isKafkaProduceCmd(j)){
-                        Producer producer = KafkaManager.getProducer();
-                        TopicAndRecords tar = script.getTopicAndRecord(j);
-                        producer.send(tar);
-                        LOG.info(String.format("Succeed to send the following messages to kafka server and topic[%s]:\n%s",tar.getTopic(),tar.getRecordsStr()));
-                    }
-
                     if(command.getSleeptime() > 0){
                         LOG.info(String.format("The tester will sleep for %s s, please wait....", command.getSleeptime()));
                         command.sleep();
@@ -383,7 +373,7 @@ public class Executor {
                     connection = getConnection(command);
                     statement = connection.createStatement();
 
-                    String sqlCmd = command.getCommand().replaceAll("\\$resources",COMMON.RESOURCE_PATH);
+                    String sqlCmd = command.getCommand().replaceAll("\\$resources", COMMON.RESOURCE_PATH);
                     if(command.isNeedWait()){
                         execWaitOperation(command);
                     }
@@ -525,7 +515,7 @@ public class Executor {
 
             try {
                 statement = connection.createStatement();
-                String sqlCmd = command.getCommand().replaceAll(COMMON.RESOURCE_PATH_FLAG,COMMON.RESOURCE_PATH);
+                String sqlCmd = command.getCommand().replaceAll(COMMON.RESOURCE_PATH_FLAG, COMMON.RESOURCE_PATH);
                 statement.execute(sqlCmd);
                 ResultSet resultSet = statement.getResultSet();
                 if (resultSet != null) {

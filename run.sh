@@ -99,14 +99,27 @@ LIB_WORKSPACE=$WORKSPACE/lib
 
 function boot {
 local libJars libJar
-for libJar in `find ${LIB_WORKSPACE} -name "*.jar"`
-do
-  libJars=${libJars}:${libJar}
-done
+# 优先使用 target/ 目录下新编译的 jar
+TARGET_JAR=$(find ${WORKSPACE}/target -name "mo-tester-*.jar" -not -name "*-test.jar" 2>/dev/null | head -1)
+if [ -n "$TARGET_JAR" ]; then
+  libJars=${TARGET_JAR}
+  echo "Using newly compiled jar: $TARGET_JAR"
+  # 排除 lib/ 目录下的旧 mo-tester jar，避免冲突
+  for libJar in `find ${LIB_WORKSPACE} -name "*.jar" -not -name "mo-tester-*.jar"`
+  do
+    libJars=${libJars}:${libJar}
+  done
+else
+  # 如果没有新编译的 jar，使用 lib/ 目录下的所有 jar
+  for libJar in `find ${LIB_WORKSPACE} -name "*.jar"`
+  do
+    libJars=${libJars}:${libJar}
+  done
+fi
 
 if [ ${TIMES} -eq 1 ]; then
   echo "This test will be only run for 1 times" | tee -a ${WORKSPACE}/log/run.log
-  java -Xms1024M -Xmx1024M -cp ${libJars} \
+  java -Xms1024M -Xmx1024M -cp ${WORKSPACE}:${libJars} \
           -Dconf.yml=${MO_YAML} \
           -Drun.yml=${RUN_YAML} \
           io.mo.Tester ${PATHC} ${METHOD} ${TYPE} ${RATE} ${INCLUDE} ${EXCLUDE} ${IGNORE} ${NOMETA} ${CHECK} ${RESOURCE} ${FORCE} ${PPROF}
@@ -115,7 +128,7 @@ else
   for i in $(seq 1 ${TIMES})
     do
       echo "The ${i} turn test has started, please wait......." | tee -a ${WORKSPACE}/log/run.log
-      java -Xms1024M -Xmx1024M -cp ${libJars} \
+      java -Xms1024M -Xmx1024M -cp ${WORKSPACE}:${libJars} \
                 -Dconf.yml=${MO_YAML} \
                 -Drun.yml=${RUN_YAML} \
                 io.mo.Tester ${PATHC} ${METHOD} ${TYPE} ${RATE} ${INCLUDE} ${EXCLUDE} ${IGNORE} ${NOMETA} ${CHECK} ${RESOURCE} ${FORCE} ${PPROF}

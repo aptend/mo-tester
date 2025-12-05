@@ -33,24 +33,25 @@ public class Tester {
         String method = RunConfUtil.getMethod();
         int rate = RunConfUtil.getRate();
         
-        COMMON.RESOURCE_PATH = RunConfUtil.getResourcePath();
+        RunConfUtil.setStaticResourcePathFromConfig();
         COMMON.WAIT_TIMEOUT = RunConfUtil.getWaitTime();
 
         //parse the paras
         if(args != null){
             for (String arg : args) {
                 //get path
+                // 约定高于配置：如果通过命令行指定 path，使用统一的推导逻辑
                 if (arg.startsWith("path")) {
-                    path = arg.split("=")[1];
-                    File caseFile = new File(path);
-                    String srcPath = null;
-                    if(caseFile.getAbsolutePath().contains(COMMON.CASES_DIR)) {
-                        srcPath = caseFile.getAbsolutePath();
-                        srcPath = srcPath.replace(COMMON.CASES_DIR,COMMON.RESOURCE_DIR);
-                        srcPath = srcPath.substring(0,srcPath.indexOf(COMMON.RESOURCE_DIR)+COMMON.RESOURCE_DIR.length());
+                    if(!arg.contains("=")){
+                        LOG.error("The format of para[path] is not valid,please check......");
+                        System.exit(1);
                     }
-                    COMMON.RESOURCE_PATH = srcPath;
-                    COMMON.RESOURCE_LOCAL_PATH = srcPath;
+                    path = arg.split("=")[1];
+                    // 使用统一的资源路径推导逻辑（与配置文件处理保持一致）
+                    RunConfUtil.setDerivedStaticResourcePath(path);
+                    LOG.info("The path is: " + path);
+                    LOG.info("The resource path is: " + COMMON.RESOURCE_PATH);
+                    LOG.info("The resource local path is: " + COMMON.RESOURCE_LOCAL_PATH);
                 }
 
                 //get method
@@ -95,13 +96,19 @@ public class Tester {
                 }
 
                 //get resource path
+                // 如果明确指定 resource 参数，直接使用（覆盖约定推导）
                 if (arg.startsWith("resource")) {
                     if(!arg.contains("=")){
                         LOG.error("The format of para[resource] is not valid,please check......");
                         System.exit(1);
                     }
                     
-                    COMMON.RESOURCE_PATH = arg.split("=")[1];
+                    String resourcePath = arg.split("=")[1];
+                    if (resourcePath != null && !resourcePath.isEmpty()) {
+                        COMMON.RESOURCE_PATH = resourcePath;
+                        // 如果明确指定了 resource，也更新 RESOURCE_LOCAL_PATH
+                        COMMON.RESOURCE_LOCAL_PATH = resourcePath;
+                    }
                 }
 
                 //get force
@@ -128,12 +135,12 @@ public class Tester {
         }
 
         if(path == null){
-            LOG.error("The scripts file path is not configured,pleas check the config file conf/run.yml.");
+            LOG.error("The scripts file path is not configured,please check the config file conf/run.yml.");
             return;
         }
 
         if(method == null){
-            LOG.error("The method of execution is not configured,pleas check the config file conf/run.yml.");
+            LOG.error("The method of execution is not configured,please check the config file conf/run.yml.");
             return;
         }
 
@@ -146,7 +153,7 @@ public class Tester {
 
 
         if(method.equalsIgnoreCase("run")){
-            LOG.info("Now start to clean up databaes and outfiles.");
+            LOG.info("Now start to clean up databases and outfiles.");
             cleanDatabases();
             removeOutfiles();
             
@@ -167,7 +174,7 @@ public class Tester {
         }
 
         if(method.equalsIgnoreCase("debug")){
-            LOG.info("Now start to clean up databaes and outfiles.");
+            LOG.info("Now start to clean up databases and outfiles.");
             cleanDatabases();
             removeOutfiles();
             debug(file);
@@ -178,7 +185,7 @@ public class Tester {
         }
 
         if(method.equalsIgnoreCase("genrs")){
-            LOG.info("Now start to clean up databaes and outfiles.");
+            LOG.info("Now start to clean up databases and outfiles.");
             cleanDatabases();
             removeOutfiles();
             LOG.info("The method is [genrs],now start to generate the checkpoints in the path["+ path +"].");
@@ -202,8 +209,12 @@ public class Tester {
             }
             
             if(isInclude(file.getPath())) {
-                ScriptParser.parseScript(file.getPath());
-                TestScript script = ScriptParser.getTestScript();
+                ScriptParser parser = new ScriptParser();
+                TestScript script = parser.parseScript(file.getPath());
+                if(script == null){
+                    LOG.error("Failed to parse script: " + file.getPath());
+                    return;
+                }
                 Executor.run(script);
                 report.collect(script);
             }
@@ -224,8 +235,8 @@ public class Tester {
             }
             
             if(isInclude(file.getPath())) {
-                ScriptParser.parseScript(file.getPath());
-                TestScript script = ScriptParser.getTestScript();
+                ScriptParser parser = new ScriptParser();
+                TestScript script = parser.parseScript(file.getPath());
                 if(!COMMON.FORCE_UPDATE){
                     if(Executor.genRS(script))
                         LOG.info("The results for the test script file["+file.getPath()+"] have been generated or updated successfully.");
@@ -253,8 +264,8 @@ public class Tester {
             }
             
             if(isInclude(file.getPath())) {
-                ScriptParser.parseScript(file.getPath());
-                TestScript script = ScriptParser.getTestScript();
+                ScriptParser parser = new ScriptParser();
+                TestScript script = parser.parseScript(file.getPath());
                 Debugger.run(script);
             }
             return;
@@ -272,8 +283,8 @@ public class Tester {
                 return;
             }
             if(isInclude(file.getPath())) {
-                ScriptParser.parseScript(file.getPath());
-                TestScript script = ScriptParser.getTestScript();
+                ScriptParser parser = new ScriptParser();
+                TestScript script = parser.parseScript(file.getPath());
                 ResultParser.check(script);
             }
             return;
@@ -397,8 +408,7 @@ public class Tester {
                 LOG.error(String.format("The outfile or path [%s] has failed to be removed, the test will be terminated ", path));
                 System.exit(1);
             }
-            
-            
+
         }
     }
 }

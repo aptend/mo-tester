@@ -1,15 +1,8 @@
 package io.mo.util;
 
-import com.alibaba.fastjson.JSON;
-import com.alibaba.fastjson.JSONArray;
-import com.alibaba.fastjson.parser.Feature;
-import com.alibaba.fastjson.parser.ParserConfig;
-import com.alibaba.fastjson.serializer.SerializerFeature;
-import freemarker.template.utility.NumberUtil;
 import io.mo.cases.SqlCommand;
 import io.mo.cases.TestScript;
 import io.mo.constant.COMMON;
-import io.mo.stream.TopicAndRecords;
 import org.apache.log4j.Logger;
 import org.apache.commons.lang3.StringUtils;
 
@@ -19,32 +12,27 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 
 public class ScriptParser {
-    private static String delimiter = COMMON.DEFAUT_DELIMITER;
-    private static TestScript testScript = new TestScript();
+    private TestScript testScript;
     private static final Logger LOG = Logger.getLogger(ScriptParser.class.getName());
 
-    public static void parseScript(String path){
-        
-        //reset delimiter to default value
-        delimiter = COMMON.DEFAUT_DELIMITER;
-        
+    public ScriptParser() {
+        this.testScript = new TestScript();
+    }
+
+    public TestScript parseScript(String path){
         testScript = new TestScript();
         testScript.setFileName(path);
         int rowNum = 1;
         try {
             BufferedReader lineReader = new BufferedReader(new InputStreamReader(Files.newInputStream(Paths.get(path))));
             SqlCommand command = new SqlCommand();
-            TopicAndRecords tar = new TopicAndRecords();
             String line = lineReader.readLine();
             String trimmedLine;
             String issueNo = null;
             boolean ignore = false;
-            boolean isProduceRecord = false;
             int con_id = 0;
             String con_user = null;
             String con_pswd = null;
-            
-            StringBuffer messages = new StringBuffer();
 
             while (line != null) {
                 line = new String(line.getBytes(), StandardCharsets.UTF_8);
@@ -59,12 +47,7 @@ public class ScriptParser {
                         issueNo = trimmedLine.substring(COMMON.BVT_SKIP_FILE_FLAG.length());
                         testScript.setSkiped(true);
                         LOG.info(String.format("The script file [%s] is marked to be skiped for issue#%s, and it will not be executed.",path,issueNo));
-                        return ;
-                    }
-
-                    if(trimmedLine.startsWith(COMMON.NEW_DELIMITER_FLAG)) {
-                        delimiter = trimmedLine.substring(COMMON.NEW_DELIMITER_FLAG.length());
-                        LOG.info(String.format("The delimiter has been set to [%s].",delimiter));
+                        return testScript;
                     }
                     
                     //if line is  mark to relate to a bvt issue
@@ -93,41 +76,9 @@ public class ScriptParser {
                         command.setRegularMatch(true);
                     }
                     
-//                    if(trimmedLine.startsWith(COMMON.KAFKA_PRODUCE_START_FLAG)){
-//                        String topic = trimmedLine.substring(COMMON.KAFKA_PRODUCE_START_FLAG.length());
-//                        if(topic == null || topic.equalsIgnoreCase("")){
-//                            LOG.error(String.format("[%s][row:%s]No topic info in kafka produce tag.",path,rowNum));
-//                            continue;
-//                        }
-//                        tar.setTopic(topic);
-//                    }
-
-                    if(trimmedLine.startsWith(COMMON.KAFKA_PRODUCE_START_FLAG)){
-                        String topic = trimmedLine.substring(COMMON.KAFKA_PRODUCE_START_FLAG.length());
-                        if(topic == null || topic.equalsIgnoreCase("")){
-                            LOG.error(String.format("[%s][row:%s]No topic info in kafka produce tag.",path,rowNum));
-                            continue;
-                        }
-                        tar.setTopic(topic);
-                        isProduceRecord = true;
-                    }
-
-                    if(trimmedLine.equalsIgnoreCase(COMMON.KAFKA_PRODUCE_END_FLAG)){
-                        isProduceRecord = false;
-                        JSONArray array = JSON.parseArray(messages.toString());
-                        for(int i = 0; i < array.size();i++){
-                            tar.addRecord(JSON.toJSONString(array.get(i),SerializerFeature.NotWriteDefaultValue));
-                        }
-                        int index = testScript.getCommands().size();
-                        testScript.addKafkaProduceRecord(index,tar);
-                        messages.delete(0,messages.length());
-                        tar = new TopicAndRecords();
-                    }
-                    
-
                     if(trimmedLine.startsWith(COMMON.IGNORE_COLUMN_FLAG)){
                         String ignores = trimmedLine.substring(COMMON.IGNORE_COLUMN_FLAG.length());
-                        if(ignores != null || !ignores.equalsIgnoreCase("")){
+                        if(ignores != null && !ignores.equalsIgnoreCase("")){
                             String[] ignore_ids = ignores.split(",");
                             for(int i = 0; i < ignore_ids.length;i++){
                                 command.addIgnoreColumn(Integer.parseInt(ignore_ids[i]));
@@ -246,18 +197,11 @@ public class ScriptParser {
                     continue;
                 }
                 
-                if(isProduceRecord){
-                    messages.append(trimmedLine);
-                    line = lineReader.readLine();
-                    rowNum++;
-                    continue;
-                }
-                
-                if(trimmedLine.contains(delimiter)){
-                    if(delimiter.equalsIgnoreCase(COMMON.DEFAUT_DELIMITER))
-                        command.append(trimmedLine);
-                    else 
-                        command.trim();
+                // Check if delimiter is at the end of line and not inside a string
+                // Pass accumulated command as context to handle multi-line strings
+                String accumulatedCommand = command.getCommand();
+                if(isDelimiterAtLineEnd(accumulatedCommand != null ? accumulatedCommand : "", trimmedLine)){
+                    command.append(trimmedLine);
                     
                     command.setConn_id(con_id);
                     command.setConn_user(con_user);
@@ -267,33 +211,252 @@ public class ScriptParser {
                     command.setPosition(rowNum);
                     testScript.addCommand(command);
                     command = new SqlCommand();
-                }else {
-                    command.append(trimmedLine);
-                    command.append(COMMON.LINE_SEPARATOR);
+                    // Skip the append below since we've already added the line and completed the command
+                    line = lineReader.readLine();
+                    rowNum++;
+                    continue;
                 }
+
+                // just append the line to the command
+                command.append(trimmedLine);
+                command.append(COMMON.LINE_SEPARATOR);
+
+                // read the next line
                 line = lineReader.readLine();
                 rowNum++;
             }
         } catch (IOException e) {
-            e.printStackTrace();
+            LOG.error("Failed to parse script: " + path, e);
+            throw new RuntimeException("Failed to parse script: " + path, e);
         }
+        return testScript;
     }
 
-    private static boolean lineIsComment(String trimmedLine) {
+    private boolean lineIsComment(String trimmedLine) {
         return trimmedLine.startsWith("//") || trimmedLine.startsWith("--") || trimmedLine.startsWith("#");
     }
 
-    public static TestScript getTestScript(){
+    /**
+     * Check if delimiter is at the end of line and not inside a string literal.
+     * This method handles complex cases including nested quotes, overlapping quotes,
+     * and multi-line strings.
+     * 
+     * <p><b>Algorithm:</b>
+     * <ol>
+     *   <li>Track string state from accumulated command (for multi-line strings)</li>
+     *   <li>Continue tracking in current line</li>
+     *   <li>Find the last delimiter position (from end, ignoring inline comments)</li>
+     *   <li>If delimiter is outside any string literal, return true</li>
+     * </ol>
+     * 
+     * <p><b>Examples:</b>
+     * <ul>
+     *   <li>{@code "SELECT * FROM t1;"} → returns {@code true}</li>
+     *   <li>{@code "INSERT INTO t1 VALUES ('hello;world');"} → returns {@code true}</li>
+     *   <li>{@code "INSERT INTO t1 VALUES (6, '`~\"\''\\');"} → returns {@code true} (handles overlapping quotes)</li>
+     *   <li>{@code accumulated: "INSERT INTO t1 VALUES ('\n", current: "');"} → returns {@code true} (multi-line string closed)</li>
+     *   <li>{@code "SELECT 'test;'"} → returns {@code false} (delimiter inside string)</li>
+     *   <li>{@code "SELECT \"test;\""} → returns {@code false} (delimiter inside string)</li>
+     * </ul>
+     * 
+     * @param accumulatedCommand the accumulated command from previous lines (for multi-line string tracking)
+     * @param currentLine the current line to check
+     * @return true if delimiter is at end of line and not in a string, false otherwise
+     */
+    private boolean isDelimiterAtLineEnd(String accumulatedCommand, String currentLine) {
+        String trimmed = currentLine.trim();
+        if (trimmed.isEmpty()) {
+            return false;
+        }
+        
+        // Find the last delimiter position, ignoring inline comments
+        int delimiterPos = findLastDelimiterPosition(trimmed);
+        if (delimiterPos == -1) {
+            return false;
+        }
+        
+        // Check if delimiter is inside any string literal, considering accumulated command
+        return !isInsideStringLiteral(accumulatedCommand, trimmed, delimiterPos);
+    }
+    
+    /**
+     * Find the last delimiter position in the line, ignoring inline comments.
+     * Inline comments (-- comment) are considered part of the line but delimiter
+     * should be before them. We need to check if -- is actually a comment (not in a string).
+     * 
+     * @param line the trimmed line
+     * @return the position of the last delimiter, or -1 if not found
+     */
+    private int findLastDelimiterPosition(String line) {
+        String delimiter = COMMON.DEFAUT_DELIMITER;
+        
+        // First, find the position where inline comment starts (if any)
+        // We need to check if -- is actually a comment (not in a string)
+        int commentStart = -1;
+        boolean inSingleQuote = false;
+        boolean inDoubleQuote = false;
+        
+        for (int i = 0; i < line.length() - 1; i++) {
+            char c = line.charAt(i);
+            
+            // Handle backslash escape
+            if (c == '\\' && i + 1 < line.length()) {
+                i++; // Skip the escaped character
+                continue;
+            }
+            
+            // Handle SQL-style escaped single quote ('')
+            if (c == '\'' && inSingleQuote && i + 1 < line.length() && line.charAt(i + 1) == '\'') {
+                i++; // Skip the second quote
+                continue;
+            }
+            
+            // Handle single quote
+            if (c == '\'' && !inDoubleQuote) {
+                inSingleQuote = !inSingleQuote;
+                continue;
+            }
+            
+            // Handle double quote
+            if (c == '"' && !inSingleQuote) {
+                inDoubleQuote = !inDoubleQuote;
+                continue;
+            }
+            
+            // Check for inline comment (-- comment) - only if not in a string
+            if (c == '-' && line.charAt(i + 1) == '-' && !inSingleQuote && !inDoubleQuote) {
+                commentStart = i;
+                break;
+            }
+        }
+        
+        // Search for delimiter from end, but stop at comment start
+        int searchEnd = commentStart == -1 ? line.length() : commentStart;
+        for (int i = searchEnd - delimiter.length(); i >= 0; i--) {
+            String substr = line.substring(i, i + delimiter.length());
+            if (substr.equals(delimiter)) {
+                return i;
+            }
+        }
+        
+        return -1;
+    }
+    
+    /**
+     * Check if a position is inside a string literal (single or double quoted).
+     * This method correctly handles:
+     * - Escaped quotes: \' and \"
+     * - SQL-style escaped single quotes: ''
+     * - Overlapping quotes: '`~"\''\\'
+     * - Multi-line strings: tracks state from accumulated command
+     * 
+     * @param accumulatedCommand the accumulated command from previous lines
+     * @param currentLine the current line to check
+     * @param position the position in current line to check (should be the delimiter position)
+     * @return true if position is inside a string literal, false otherwise
+     */
+    private boolean isInsideStringLiteral(String accumulatedCommand, String currentLine, int position) {
+        // First, track string state through accumulated command
+        StringState state = trackStringState(accumulatedCommand);
+        
+        // Then, continue tracking through current line up to delimiter position
+        for (int i = 0; i < position; i++) {
+            char c = currentLine.charAt(i);
+            
+            // Handle SQL-style escaped single quote ('') first - only valid inside single quote string
+            // This must be checked before backslash escape to correctly handle cases like '\''
+            if (c == '\'' && state.inSingleQuote && i + 1 < currentLine.length() && 
+                currentLine.charAt(i + 1) == '\'') {
+                i++; // Skip the second quote
+                continue;
+            }
+            
+            // Handle backslash escape - only valid inside the corresponding quote type
+            // Check this after SQL-style escape to avoid interfering with '' pattern
+            if (c == '\\' && i + 1 < currentLine.length() && 
+                (state.inSingleQuote || state.inDoubleQuote)) {
+                i++; // Skip the escaped character
+                continue;
+            }
+            
+            // Handle single quote - only toggle if not in double quote string
+            if (c == '\'' && !state.inDoubleQuote) {
+                state.inSingleQuote = !state.inSingleQuote;
+                continue;
+            }
+            
+            // Handle double quote - only toggle if not in single quote string
+            if (c == '"' && !state.inSingleQuote) {
+                state.inDoubleQuote = !state.inDoubleQuote;
+                continue;
+            }
+        }
+        
+        return state.inSingleQuote || state.inDoubleQuote;
+    }
+    
+    /**
+     * Track string literal state through a text segment.
+     * Returns the final state (whether we're inside single or double quoted string).
+     * 
+     * @param text the text to track through
+     * @return StringState object containing the final state
+     */
+    private StringState trackStringState(String text) {
+        StringState state = new StringState();
+        if (text == null || text.isEmpty()) {
+            return state;
+        }
+        
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            
+            // Handle SQL-style escaped single quote ('') first - only valid inside single quote string
+            // This must be checked before backslash escape to correctly handle cases like '\''
+            if (c == '\'' && state.inSingleQuote && i + 1 < text.length() && 
+                text.charAt(i + 1) == '\'') {
+                i++; // Skip the second quote
+                continue;
+            }
+            
+            // Handle backslash escape - only valid inside the corresponding quote type
+            // Check this after SQL-style escape to avoid interfering with '' pattern
+            if (c == '\\' && i + 1 < text.length() && 
+                (state.inSingleQuote || state.inDoubleQuote)) {
+                i++; // Skip the escaped character
+                continue;
+            }
+            
+            // Handle single quote - only toggle if not in double quote string
+            if (c == '\'' && !state.inDoubleQuote) {
+                state.inSingleQuote = !state.inSingleQuote;
+                continue;
+            }
+            
+            // Handle double quote - only toggle if not in single quote string
+            if (c == '"' && !state.inSingleQuote) {
+                state.inDoubleQuote = !state.inDoubleQuote;
+                continue;
+            }
+        }
+        
+        return state;
+    }
+    
+    /**
+     * Helper class to track string literal state.
+     */
+    private static class StringState {
+        boolean inSingleQuote = false;
+        boolean inDoubleQuote = false;
+    }
+
+    public TestScript getTestScript(){
         return testScript;
     }
 
     public static void main(String[] args){
-        String str = "[{\"c1\":\"yyjjuejf\",\"c2\":\"中国\",\"c3\":\"##$%^&@\",\"c4\":\"\"},\n" +
-                "{\"c1\":NULL,\"c2\":\"0xDERFW9883\",\"c3\":\"5727362\",\"c4\":\"x'612543'\"}]";
-        System.out.println(str);
-        JSONArray array = JSON.parseArray(str);
-        for(int i = 0 ; i < array.size();i++) {
-            System.out.println(JSON.toJSONString(array.get(i),SerializerFeature.WriteMapNullValue));
-        }
+       
     }
 }
+

@@ -2,3 +2,4 @@ report/*
 log/*
 .idea/
 .vscode/
+target/
