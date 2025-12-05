@@ -6,6 +6,8 @@ import junit.framework.TestCase;
 import junit.framework.TestSuite;
 
 import java.io.File;
+import java.io.FileWriter;
+import java.io.PrintWriter;
 import java.nio.file.Paths;
 
 /**
@@ -548,6 +550,44 @@ public class ScriptParserTest extends TestCase {
                     (Boolean) method.invoke(parser, "", ""));
         assertFalse("Whitespace only", 
                     (Boolean) method.invoke(parser, "", "   "));
+    }
+    
+    /**
+     * 测试实际 SQL 文件中的问题案例
+     * 直接测试 parseScript 方法，模拟实际运行情况
+     */
+    public void testActualSQLFileCase() throws Exception {
+        // 创建一个临时 SQL 文件，包含问题语句
+        File tempFile = File.createTempFile("test_", ".sql");
+        tempFile.deleteOnExit();
+        
+        try (PrintWriter writer = new PrintWriter(new FileWriter(tempFile))) {
+            // 写入问题语句
+            writer.println("INSERT INTO t_insert_test VALUES (5, '!@#$%^&*()_+-=[]{}|;:,.<>?');");
+            writer.println("INSERT INTO t_insert_test VALUES (6, '`~\"\\''\\\\');");
+            writer.println("INSERT INTO t_insert_test VALUES (10, '你好世界');");
+            writer.println("INSERT INTO t_insert_test VALUES (11, '中文测试');");
+            writer.println("INSERT INTO t_insert_test VALUES (12, '汉字');");
+            writer.println("INSERT INTO t_insert_test VALUES ('");
+            writer.println("file");
+            writer.println("');");
+        }
+        
+        ScriptParser parser = new ScriptParser();
+        TestScript testScript = parser.parseScript(tempFile.getAbsolutePath());
+        
+        assertNotNull("TestScript should not be null", testScript);
+        StringBuilder commandBuilder = new StringBuilder();
+        int i = 0;
+        for (SqlCommand cmd : testScript.getCommands()) {
+            commandBuilder.append(cmd.getCommand());
+            commandBuilder.append("\n");
+            System.out.println(String.format("============ Command: [%s]", i + ": " + cmd.getCommand()));
+            i++;
+        }
+        System.out.println(String.format("Total commands -> %s\n", testScript.getCommands().size()));
+        assertEquals("Should have exactly commands", 6, testScript.getTotalCmdCount());
+       
     }
 }
 

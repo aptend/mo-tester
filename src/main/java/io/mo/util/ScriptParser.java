@@ -200,6 +200,10 @@ public class ScriptParser {
                 // Check if delimiter is at the end of line and not inside a string
                 // Pass accumulated command as context to handle multi-line strings
                 String accumulatedCommand = command.getCommand();
+                if (trimmedLine.contains("t_insert_test VALUES (1")) {
+                    System.out.println(String.format("accumulatedCommand: [%s]", accumulatedCommand));
+                    System.out.println(String.format("Start to parse the script file: [%s]", rowNum + ": " + trimmedLine));
+                }
                 if(isDelimiterAtLineEnd(accumulatedCommand != null ? accumulatedCommand : "", trimmedLine)){
                     command.append(trimmedLine);
                     

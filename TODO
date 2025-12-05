@@ -3,6 +3,8 @@
 
 - 删除对 Resource_Local 的使用，都用 Resource
 
+- fix: ScriptParser 不要 trim leading spaces, 保留多行原汁原味展示
+
 - fix handle separator in convertToRSSet
          //first,replace separator to the system designated separator
         //Use Pattern.quote to treat the separator as literal string, not regex
