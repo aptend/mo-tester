@@ -582,6 +582,9 @@ public class ScriptParserTest {
             writer.println("');");
             writer.println("INSERT INTO t_special_chars VALUES (3, 'Quote:\\'test\\'');");
             writer.println("select * from t_special_chars;");
+            writer.println("create table x2 (a int comment '\"%$^&*()_+@!\\'',");
+            writer.println("b int comment 'bint'");
+            writer.println(");");
         }
         
         ScriptParser parser = new ScriptParser();
@@ -589,7 +592,7 @@ public class ScriptParserTest {
         
         assertNotNull("TestScript should not be null", testScript);
     
-        assertEquals("Should have exactly commands", 8, testScript.getTotalCmdCount());
+        assertEquals("Should have exactly commands", 9, testScript.getTotalCmdCount());
        
     }
     

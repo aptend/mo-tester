@@ -243,9 +243,8 @@ public class ScriptParser {
      * 
      * <p><b>Algorithm:</b>
      * <ol>
-     *   <li>Track string state from accumulated command (for multi-line strings)</li>
-     *   <li>Continue tracking in current line</li>
-     *   <li>Find the last delimiter position (from end, ignoring inline comments)</li>
+     *   <li>Find the last delimiter position, ignoring inline comments</li>
+     *   <li>Track string state from accumulated command through current line to delimiter position</li>
      *   <li>If delimiter is outside any string literal, return true</li>
      * </ol>
      * 
@@ -269,169 +268,144 @@ public class ScriptParser {
             return false;
         }
         
-        // Find the last delimiter position, ignoring inline comments
-        int delimiterPos = findLastDelimiterPosition(trimmed);
+        String delimiter = COMMON.DEFAUT_DELIMITER;
+        
+        // Step 1: Track string state from accumulated command through current line
+        // This unified tracking will help us find both comments and delimiter correctly
+        StringState state = trackStringState(accumulatedCommand);
+        int commentStart = -1;
+        
+        // Track state through current line and find comment start
+        for (int i = 0; i < trimmed.length(); i++) {
+            int newPos = processChar(trimmed, i, state);
+            
+            // Check for inline comment (-- comment) - only if not in a string
+            if (commentStart == -1 && newPos < trimmed.length() - 1 && 
+                trimmed.charAt(newPos) == '-' && trimmed.charAt(newPos + 1) == '-' && 
+                !state.inSingleQuote && !state.inDoubleQuote) {
+                commentStart = newPos;
+            }
+            
+            i = newPos;
+        }
+        
+        // Step 2: Search for delimiter from end, but stop at comment start
+        int searchEnd = commentStart == -1 ? trimmed.length() : commentStart;
+        int delimiterPos = -1;
+        for (int i = searchEnd - delimiter.length(); i >= 0; i--) {
+            if (i + delimiter.length() <= trimmed.length()) {
+                String substr = trimmed.substring(i, i + delimiter.length());
+                if (substr.equals(delimiter)) {
+                    delimiterPos = i;
+                    break;
+                }
+            }
+        }
+        
         if (delimiterPos == -1) {
             return false;
         }
         
-        // Check if delimiter is inside any string literal, considering accumulated command
-        return !isInsideStringLiteral(accumulatedCommand, trimmed, delimiterPos);
+        // Step 3: Track string state from accumulated command through current line to delimiter position
+        // We need to re-track because we need the state at delimiter position, not at end of line
+        state = trackStringState(accumulatedCommand);
+        for (int i = 0; i < delimiterPos; i++) {
+            i = processChar(trimmed, i, state);
+        }
+        
+        // Step 4: Check if delimiter is inside any string literal
+        return !state.inSingleQuote && !state.inDoubleQuote;
     }
     
     /**
-     * Find the last delimiter position in the line, ignoring inline comments.
-     * Inline comments (-- comment) are considered part of the line but delimiter
-     * should be before them. We need to check if -- is actually a comment (not in a string).
-     * 
-     * @param line the trimmed line
-     * @return the position of the last delimiter, or -1 if not found
-     */
-    private int findLastDelimiterPosition(String line) {
-        String delimiter = COMMON.DEFAUT_DELIMITER;
-        
-        // First, find the position where inline comment starts (if any)
-        // We need to check if -- is actually a comment (not in a string)
-        int commentStart = -1;
-        boolean inSingleQuote = false;
-        boolean inDoubleQuote = false;
-        
-        for (int i = 0; i < line.length() - 1; i++) {
-            char c = line.charAt(i);
-            
-            // Handle backslash escape first
-            if (c == '\\' && i + 1 < line.length() && 
-                (inSingleQuote || inDoubleQuote)) {
-                char nextChar = line.charAt(i + 1);
-                // Special case: \'' in single-quoted string, but only if there's another character after the second quote
-                // AND that character is not a closing parenthesis or semicolon (which would indicate end of SQL statement)
-                // This handles cases like '`~"\''\\' where \'' is followed by more string content
-                // But NOT cases like 'Quote:\'test\'' where \'' is at the end of the string value
-                if (inSingleQuote && nextChar == '\'' && i + 2 < line.length() && 
-                    line.charAt(i + 2) == '\'' && i + 3 < line.length()) {
-                    char afterSecondQuote = line.charAt(i + 3);
-                    // Only treat as special case if there's actual string content after \''
-                    // (not closing paren, semicolon, or whitespace that might indicate end)
-                    if (afterSecondQuote != ')' && afterSecondQuote != ';' && 
-                        (afterSecondQuote != ' ' || i + 4 < line.length())) {
-                        // There's content after \'', so treat it as: \' (escaped quote) + ' (part of SQL-style '')
-                        // Skip \' and first ' of ''
-                        i += 2;
-                        continue;
-                    }
-                }
-                // Normal backslash escape: skip the escaped character
-                i++; // Skip the escaped character
-                continue;
-            }
-            
-            // Handle SQL-style escaped single quote ('')
-            if (c == '\'' && inSingleQuote && i + 1 < line.length() && line.charAt(i + 1) == '\'') {
-                i++; // Skip the second quote
-                continue;
-            }
-            
-            // Handle single quote
-            if (c == '\'' && !inDoubleQuote) {
-                inSingleQuote = !inSingleQuote;
-                continue;
-            }
-            
-            // Handle double quote
-            if (c == '"' && !inSingleQuote) {
-                inDoubleQuote = !inDoubleQuote;
-                continue;
-            }
-            
-            // Check for inline comment (-- comment) - only if not in a string
-            if (c == '-' && line.charAt(i + 1) == '-' && !inSingleQuote && !inDoubleQuote) {
-                commentStart = i;
-                break;
-            }
-        }
-        
-        // Search for delimiter from end, but stop at comment start
-        int searchEnd = commentStart == -1 ? line.length() : commentStart;
-        for (int i = searchEnd - delimiter.length(); i >= 0; i--) {
-            String substr = line.substring(i, i + delimiter.length());
-            if (substr.equals(delimiter)) {
-                return i;
-            }
-        }
-        
-        return -1;
-    }
-    
-    /**
-     * Check if a position is inside a string literal (single or double quoted).
-     * This method correctly handles:
-     * - Escaped quotes: \' and \"
+     * Process a character and update string state accordingly.
+     * Handles:
+     * - Backslash escapes: \', \", \\
      * - SQL-style escaped single quotes: ''
-     * - Overlapping quotes: '`~"\''\\'
-     * - Multi-line strings: tracks state from accumulated command
+     * - Special case: \'' in single-quoted strings (needs context-aware handling)
+     * - Quote toggling: ', "
      * 
-     * @param accumulatedCommand the accumulated command from previous lines
-     * @param currentLine the current line to check
-     * @param position the position in current line to check (should be the delimiter position)
-     * @return true if position is inside a string literal, false otherwise
+     * @param text the text being processed
+     * @param pos the current position
+     * @param state the current string state
+     * @return the new position (may be advanced if escape sequences are processed)
      */
-    private boolean isInsideStringLiteral(String accumulatedCommand, String currentLine, int position) {
-        // First, track string state through accumulated command
-        StringState state = trackStringState(accumulatedCommand);
-        
-        // Then, continue tracking through current line up to delimiter position
-        for (int i = 0; i < position; i++) {
-            char c = currentLine.charAt(i);
-            
-            // Handle backslash escape first - only valid inside the corresponding quote type
-            // This must be checked before SQL-style escape to correctly handle cases like '\''
-            if (c == '\\' && i + 1 < currentLine.length() && 
-                (state.inSingleQuote || state.inDoubleQuote)) {
-                char nextChar = currentLine.charAt(i + 1);
-                // Special case: \'' in single-quoted string, but only if there's another character after the second quote
-                // AND that character is not a closing parenthesis or semicolon (which would indicate end of SQL statement)
-                // This handles cases like '`~"\''\\' where \'' is followed by more string content
-                // But NOT cases like 'Quote:\'test\'' where \'' is at the end of the string value
-                if (state.inSingleQuote && nextChar == '\'' && i + 2 < currentLine.length() && 
-                    currentLine.charAt(i + 2) == '\'' && i + 3 < currentLine.length()) {
-                    char afterSecondQuote = currentLine.charAt(i + 3);
-                    // Only treat as special case if there's actual string content after \''
-                    // (not closing paren, semicolon, or whitespace that might indicate end)
-                    if (afterSecondQuote != ')' && afterSecondQuote != ';' && 
-                        (afterSecondQuote != ' ' || i + 4 < currentLine.length())) {
-                        // There's content after \'', so treat it as: \' (escaped quote) + ' (part of SQL-style '')
-                        // Skip \' and first ' of ''
-                        i += 2;
-                        continue;
-                    }
-                }
-                // Normal backslash escape: skip the escaped character
-                i++; // Skip the escaped character
-                continue;
-            }
-            
-            // Handle SQL-style escaped single quote ('') - only valid inside single quote string
-            // Check this after backslash escape to avoid interfering with \' pattern
-            if (c == '\'' && state.inSingleQuote && i + 1 < currentLine.length() && 
-                currentLine.charAt(i + 1) == '\'') {
-                i++; // Skip the second quote
-                continue;
-            }
-            
-            // Handle single quote - only toggle if not in double quote string
-            if (c == '\'' && !state.inDoubleQuote) {
-                state.inSingleQuote = !state.inSingleQuote;
-                continue;
-            }
-            
-            // Handle double quote - only toggle if not in single quote string
-            if (c == '"' && !state.inSingleQuote) {
-                state.inDoubleQuote = !state.inDoubleQuote;
-                continue;
-            }
+    private int processChar(String text, int pos, StringState state) {
+        if (pos >= text.length()) {
+            return pos;
         }
         
-        return state.inSingleQuote || state.inDoubleQuote;
+        char c = text.charAt(pos);
+        
+        // Handle backslash escape - only valid inside the corresponding quote type
+        if (c == '\\' && pos + 1 < text.length() && 
+            (state.inSingleQuote || state.inDoubleQuote)) {
+            char nextChar = text.charAt(pos + 1);
+            
+            // Special case: \'' in single-quoted string
+            // When we see \'', we need to determine if the second quote is part of SQL-style '' escape
+            // or if it's the string terminator.
+            // Strategy: Only treat \'' specially if it's clearly in the middle of string content.
+            // If \'' is followed by SQL syntax terminators (like ), ;, or , at end), it's string end.
+            if (state.inSingleQuote && nextChar == '\'' && pos + 2 < text.length() && 
+                text.charAt(pos + 2) == '\'') {
+                // Check if \'' is followed by more string content (not SQL syntax)
+                boolean hasMoreStringContent = false;
+                if (pos + 3 < text.length()) {
+                    char afterSecondQuote = text.charAt(pos + 3);
+                    // If followed by ), ;, it's definitely string end
+                    if (afterSecondQuote == ')' || afterSecondQuote == ';') {
+                        hasMoreStringContent = false;
+                    } else if (afterSecondQuote == ',') {
+                        // Comma: in CREATE TABLE, comma at end typically ends the value
+                        // Check if there's more non-whitespace content after comma on the SAME line
+                        // We need to check if comma is followed by newline (end of line) or more content
+                        int j = pos + 4;
+                        while (j < text.length() && Character.isWhitespace(text.charAt(j)) && 
+                               text.charAt(j) != '\n' && text.charAt(j) != '\r') {
+                            j++;
+                        }
+                        // Only if comma is followed by non-whitespace on the same line (not newline), it's more content
+                        hasMoreStringContent = (j < text.length() && text.charAt(j) != '\n' && text.charAt(j) != '\r');
+                    } else {
+                        // Other characters indicate more string content
+                        hasMoreStringContent = true;
+                    }
+                }
+                // else: no more characters, so \'' is at end, don't special handle
+                
+                if (hasMoreStringContent) {
+                    // There's string content after \'', so treat it as: \' (escaped quote) + ' (part of SQL-style '')
+                    // Skip \' and first ' of ''
+                    return pos + 2;
+                }
+                // Otherwise, treat \' normally (skip escaped quote), let the '' be handled by SQL-style escape logic
+            }
+            // Normal backslash escape: skip the escaped character
+            return pos + 1;
+        }
+        
+        // Handle SQL-style escaped single quote ('') - only valid inside single quote string
+        // This must be checked before single quote toggle to avoid interfering
+        if (c == '\'' && state.inSingleQuote && pos + 1 < text.length() && 
+            text.charAt(pos + 1) == '\'') {
+            // Skip the second quote
+            return pos + 1;
+        }
+        
+        // Handle single quote - only toggle if not in double quote string
+        if (c == '\'' && !state.inDoubleQuote) {
+            state.inSingleQuote = !state.inSingleQuote;
+            return pos;
+        }
+        
+        // Handle double quote - only toggle if not in single quote string
+        if (c == '"' && !state.inSingleQuote) {
+            state.inDoubleQuote = !state.inDoubleQuote;
+            return pos;
+        }
+        
+        return pos;
     }
     
     /**
@@ -448,54 +422,7 @@ public class ScriptParser {
         }
         
         for (int i = 0; i < text.length(); i++) {
-            char c = text.charAt(i);
-            
-            // Handle backslash escape first - only valid inside the corresponding quote type
-            // This must be checked before SQL-style escape to correctly handle cases like '\''
-            if (c == '\\' && i + 1 < text.length() && 
-                (state.inSingleQuote || state.inDoubleQuote)) {
-                char nextChar = text.charAt(i + 1);
-                // Special case: \'' in single-quoted string, but only if there's another character after the second quote
-                // AND that character is not a closing parenthesis or semicolon (which would indicate end of SQL statement)
-                // This handles cases like '`~"\''\\' where \'' is followed by more string content
-                // But NOT cases like 'Quote:\'test\'' where \'' is at the end of the string value
-                if (state.inSingleQuote && nextChar == '\'' && i + 2 < text.length() && 
-                    text.charAt(i + 2) == '\'' && i + 3 < text.length()) {
-                    char afterSecondQuote = text.charAt(i + 3);
-                    // Only treat as special case if there's actual string content after \''
-                    // (not closing paren, semicolon, or whitespace that might indicate end)
-                    if (afterSecondQuote != ')' && afterSecondQuote != ';' && 
-                        (afterSecondQuote != ' ' || i + 4 < text.length())) {
-                        // There's content after \'', so treat it as: \' (escaped quote) + ' (part of SQL-style '')
-                        // Skip \' and first ' of ''
-                        i += 2;
-                        continue;
-                    }
-                }
-                // Normal backslash escape: skip the escaped character
-                i++; // Skip the escaped character
-                continue;
-            }
-            
-            // Handle SQL-style escaped single quote ('') - only valid inside single quote string
-            // Check this after backslash escape to avoid interfering with \' pattern
-            if (c == '\'' && state.inSingleQuote && i + 1 < text.length() && 
-                text.charAt(i + 1) == '\'') {
-                i++; // Skip the second quote
-                continue;
-            }
-            
-            // Handle single quote - only toggle if not in double quote string
-            if (c == '\'' && !state.inDoubleQuote) {
-                state.inSingleQuote = !state.inSingleQuote;
-                continue;
-            }
-            
-            // Handle double quote - only toggle if not in single quote string
-            if (c == '"' && !state.inSingleQuote) {
-                state.inDoubleQuote = !state.inDoubleQuote;
-                continue;
-            }
+            i = processChar(text, i, state);
         }
         
         return state;
