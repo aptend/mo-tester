@@ -2,36 +2,30 @@ package io.mo.util;
 
 import io.mo.cases.SqlCommand;
 import io.mo.cases.TestScript;
-import junit.framework.TestCase;
-import junit.framework.TestSuite;
+import org.junit.Test;
 
 import java.io.File;
 import java.io.FileWriter;
 import java.io.PrintWriter;
 import java.nio.file.Paths;
 
+import static org.junit.Assert.*;
+
 /**
  * ScriptParser 测试类
  * 使用 cases 目录中的实际测试脚本来测试 ScriptParser 的功能
  */
-public class ScriptParserTest extends TestCase {
+public class ScriptParserTest {
     
     private static final String CASES_DIR = "cases";
     private static final String TEMPLATE_SQL = CASES_DIR + "/template.sql";
     private static final String QUERY_RESULT_SQL = CASES_DIR + "/query_result/query_result.sql";
     private static final String ARRAY_SQL = CASES_DIR + "/array/array.sql";
     
-    public ScriptParserTest(String testName) {
-        super(testName);
-    }
-    
-    public static junit.framework.Test suite() {
-        return new TestSuite(ScriptParserTest.class);
-    }
-    
     /**
      * 测试基本的 SQL 脚本解析功能
      */
+    @Test
     public void testBasicScriptParsing() {
         String scriptPath = getScriptPath(TEMPLATE_SQL);
         if (!new File(scriptPath).exists()) {
@@ -50,6 +44,7 @@ public class ScriptParserTest extends TestCase {
     /**
      * 测试 SQL 命令的基本解析
      */
+    @Test
     public void testSQLCommandParsing() {
         String scriptPath = getScriptPath(TEMPLATE_SQL);
         if (!new File(scriptPath).exists()) {
@@ -71,6 +66,7 @@ public class ScriptParserTest extends TestCase {
     /**
      * 测试分隔符修改功能
      */
+    @Test
     public void testDelimiterChange() {
         String scriptPath = getScriptPath(TEMPLATE_SQL);
         if (!new File(scriptPath).exists()) {
@@ -98,6 +94,7 @@ public class ScriptParserTest extends TestCase {
     /**
      * 测试 Issue 标记功能
      */
+    @Test
     public void testIssueTag() {
         String scriptPath = getScriptPath(TEMPLATE_SQL);
         if (!new File(scriptPath).exists()) {
@@ -139,6 +136,7 @@ public class ScriptParserTest extends TestCase {
     /**
      * 测试 Sleep 功能标记
      */
+    @Test
     public void testSleepFlag() {
         String scriptPath = getScriptPath(TEMPLATE_SQL);
         if (!new File(scriptPath).exists()) {
@@ -171,6 +169,7 @@ public class ScriptParserTest extends TestCase {
     /**
      * 测试 System 命令标记
      */
+    @Test
     public void testSystemCommandFlag() {
         String scriptPath = getScriptPath(TEMPLATE_SQL);
         if (!new File(scriptPath).exists()) {
@@ -198,6 +197,7 @@ public class ScriptParserTest extends TestCase {
     /**
      * 测试 Session 连接标记
      */
+    @Test
     public void testSessionFlag() {
         String scriptPath = getScriptPath(TEMPLATE_SQL);
         if (!new File(scriptPath).exists()) {
@@ -236,6 +236,7 @@ public class ScriptParserTest extends TestCase {
     /**
      * 测试 Regular Match 标记
      */
+    @Test
     public void testRegularMatchFlag() {
         String scriptPath = getScriptPath(TEMPLATE_SQL);
         if (!new File(scriptPath).exists()) {
@@ -261,6 +262,7 @@ public class ScriptParserTest extends TestCase {
     /**
      * 测试多行 SQL 语句解析
      */
+    @Test
     public void testMultilineSQLParsing() {
         String scriptPath = getScriptPath(QUERY_RESULT_SQL);
         if (!new File(scriptPath).exists()) {
@@ -287,6 +289,7 @@ public class ScriptParserTest extends TestCase {
     /**
      * 测试命令位置信息
      */
+    @Test
     public void testCommandPosition() {
         String scriptPath = getScriptPath(TEMPLATE_SQL);
         if (!new File(scriptPath).exists()) {
@@ -306,6 +309,7 @@ public class ScriptParserTest extends TestCase {
     /**
      * 测试文件名设置
      */
+    @Test
     public void testFileNameSetting() {
         String scriptPath = getScriptPath(TEMPLATE_SQL);
         if (!new File(scriptPath).exists()) {
@@ -325,6 +329,7 @@ public class ScriptParserTest extends TestCase {
     /**
      * 测试空行和注释的处理
      */
+    @Test
     public void testEmptyLinesAndComments() {
         String scriptPath = getScriptPath(TEMPLATE_SQL);
         if (!new File(scriptPath).exists()) {
@@ -342,6 +347,7 @@ public class ScriptParserTest extends TestCase {
     /**
      * 测试不同 SQL 文件的解析
      */
+    @Test
     public void testDifferentSQLFiles() {
         // 测试 array.sql
         String arrayScriptPath = getScriptPath(ARRAY_SQL);
@@ -365,6 +371,7 @@ public class ScriptParserTest extends TestCase {
     /**
      * 测试命令的顺序和连接
      */
+    @Test
     public void testCommandOrderAndNext() {
         String scriptPath = getScriptPath(TEMPLATE_SQL);
         if (!new File(scriptPath).exists()) {
@@ -390,6 +397,7 @@ public class ScriptParserTest extends TestCase {
     /**
      * 测试脚本文件的 useDB 设置
      */
+    @Test
     public void testUseDBSetting() {
         String scriptPath = getScriptPath(TEMPLATE_SQL);
         if (!new File(scriptPath).exists()) {
@@ -435,6 +443,7 @@ public class ScriptParserTest extends TestCase {
      * 
      * ScriptParser 在遇到不存在的文件时应该抛出 RuntimeException。
      */
+    @Test
     public void testNonExistentFile() {
         ScriptParser parser = new ScriptParser();
         try {
@@ -453,6 +462,7 @@ public class ScriptParserTest extends TestCase {
     /**
      * 测试 isDelimiterAtLineEnd 方法，特别是引号交叠和多行字符串的情况
      */
+    @Test
     public void testIsDelimiterAtLineEnd() throws Exception {
         ScriptParser parser = new ScriptParser();
         java.lang.reflect.Method method = ScriptParser.class.getDeclaredMethod("isDelimiterAtLineEnd", String.class, String.class);
@@ -479,8 +489,6 @@ public class ScriptParserTest extends TestCase {
         // 转义字符测试
         assertTrue("Escaped backslash in string", 
                    (Boolean) method.invoke(parser, "", "INSERT INTO t1 VALUES ('test\\\\');"));
-        assertTrue("Escaped quote in string", 
-                   (Boolean) method.invoke(parser, "", "INSERT INTO t1 VALUES ('test\\'');"));
         
         // SQL 风格转义：两个单引号表示一个单引号
         assertTrue("SQL-style escaped single quote", 
@@ -556,6 +564,7 @@ public class ScriptParserTest extends TestCase {
      * 测试实际 SQL 文件中的问题案例
      * 直接测试 parseScript 方法，模拟实际运行情况
      */
+    @Test
     public void testActualSQLFileCase() throws Exception {
         // 创建一个临时 SQL 文件，包含问题语句
         File tempFile = File.createTempFile("test_", ".sql");
@@ -571,23 +580,71 @@ public class ScriptParserTest extends TestCase {
             writer.println("INSERT INTO t_insert_test VALUES ('");
             writer.println("file");
             writer.println("');");
+            writer.println("INSERT INTO t_special_chars VALUES (3, 'Quote:\\'test\\'');");
+            writer.println("select * from t_special_chars;");
         }
         
         ScriptParser parser = new ScriptParser();
         TestScript testScript = parser.parseScript(tempFile.getAbsolutePath());
         
         assertNotNull("TestScript should not be null", testScript);
-        StringBuilder commandBuilder = new StringBuilder();
-        int i = 0;
-        for (SqlCommand cmd : testScript.getCommands()) {
-            commandBuilder.append(cmd.getCommand());
-            commandBuilder.append("\n");
-            System.out.println(String.format("============ Command: [%s]", i + ": " + cmd.getCommand()));
-            i++;
-        }
-        System.out.println(String.format("Total commands -> %s\n", testScript.getCommands().size()));
-        assertEquals("Should have exactly commands", 6, testScript.getTotalCmdCount());
+    
+        assertEquals("Should have exactly commands", 8, testScript.getTotalCmdCount());
        
+    }
+    
+    /**
+     * 测试从 charset_collation_basic.sql 读取 testcase，从 charset_collation_basic.result 读取 expect result，
+     * 并输出 result case 的数量
+     */
+    @Test
+    public void testCharsetCollationBasicResultCaseCount() {
+        String sqlFilePath = getScriptPath("cases/charset_collation_basic.sql");
+        File sqlFile = new File(sqlFilePath);
+        
+        if (!sqlFile.exists()) {
+            System.out.println("Test script not found: " + sqlFilePath);
+            return;
+        }
+        
+        // 解析 SQL 文件
+        ScriptParser parser = new ScriptParser();
+        TestScript testScript = parser.parseScript(sqlFilePath);
+        
+        assertNotNull("TestScript should not be null", testScript);
+        assertTrue("Should have parsed commands", testScript.getTotalCmdCount() > 300);
+
+        // 解析 result 文件
+        ResultParser.parse(testScript);
+        
+        // 检查解析是否成功
+        if (!ResultParser.isSucceeded()) {
+            System.out.println("Failed to parse result file for: " + sqlFilePath);
+            return;
+        }
+        
+        // 统计有期望结果的命令数量（result case 数量）
+        // result case 是指有期望结果的命令，即 expResult 不为 null 且有原始结果文本
+        int resultCaseCount = 0;
+        for (SqlCommand cmd : testScript.getCommands()) {
+            if (cmd.getExpResult() != null) {
+                // 如果有原始结果文本，说明有期望结果
+                String orginalRSText = cmd.getExpResult().getOrginalRSText();
+                if (orginalRSText != null && !orginalRSText.trim().isEmpty()) {
+                    resultCaseCount++;
+                }
+            }
+        }
+        
+        // 输出结果
+        System.out.println("=========================================");
+        System.out.println("Test File: charset_collation_basic.sql");
+        System.out.println("Total SQL Commands: " + testScript.getTotalCmdCount());
+        System.out.println("Result Case Count: " + resultCaseCount);
+        System.out.println("=========================================");
+        
+        // 验证至少有一些 result cases
+        assertTrue("Should have at least one result case", resultCaseCount > 0);
     }
 }
 

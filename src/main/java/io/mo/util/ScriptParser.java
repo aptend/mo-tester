@@ -200,10 +200,6 @@ public class ScriptParser {
                 // Check if delimiter is at the end of line and not inside a string
                 // Pass accumulated command as context to handle multi-line strings
                 String accumulatedCommand = command.getCommand();
-                if (trimmedLine.contains("t_insert_test VALUES (1")) {
-                    System.out.println(String.format("accumulatedCommand: [%s]", accumulatedCommand));
-                    System.out.println(String.format("Start to parse the script file: [%s]", rowNum + ": " + trimmedLine));
-                }
                 if(isDelimiterAtLineEnd(accumulatedCommand != null ? accumulatedCommand : "", trimmedLine)){
                     command.append(trimmedLine);
                     
@@ -303,8 +299,28 @@ public class ScriptParser {
         for (int i = 0; i < line.length() - 1; i++) {
             char c = line.charAt(i);
             
-            // Handle backslash escape
-            if (c == '\\' && i + 1 < line.length()) {
+            // Handle backslash escape first
+            if (c == '\\' && i + 1 < line.length() && 
+                (inSingleQuote || inDoubleQuote)) {
+                char nextChar = line.charAt(i + 1);
+                // Special case: \'' in single-quoted string, but only if there's another character after the second quote
+                // AND that character is not a closing parenthesis or semicolon (which would indicate end of SQL statement)
+                // This handles cases like '`~"\''\\' where \'' is followed by more string content
+                // But NOT cases like 'Quote:\'test\'' where \'' is at the end of the string value
+                if (inSingleQuote && nextChar == '\'' && i + 2 < line.length() && 
+                    line.charAt(i + 2) == '\'' && i + 3 < line.length()) {
+                    char afterSecondQuote = line.charAt(i + 3);
+                    // Only treat as special case if there's actual string content after \''
+                    // (not closing paren, semicolon, or whitespace that might indicate end)
+                    if (afterSecondQuote != ')' && afterSecondQuote != ';' && 
+                        (afterSecondQuote != ' ' || i + 4 < line.length())) {
+                        // There's content after \'', so treat it as: \' (escaped quote) + ' (part of SQL-style '')
+                        // Skip \' and first ' of ''
+                        i += 2;
+                        continue;
+                    }
+                }
+                // Normal backslash escape: skip the escaped character
                 i++; // Skip the escaped character
                 continue;
             }
@@ -367,19 +383,38 @@ public class ScriptParser {
         for (int i = 0; i < position; i++) {
             char c = currentLine.charAt(i);
             
-            // Handle SQL-style escaped single quote ('') first - only valid inside single quote string
-            // This must be checked before backslash escape to correctly handle cases like '\''
-            if (c == '\'' && state.inSingleQuote && i + 1 < currentLine.length() && 
-                currentLine.charAt(i + 1) == '\'') {
-                i++; // Skip the second quote
+            // Handle backslash escape first - only valid inside the corresponding quote type
+            // This must be checked before SQL-style escape to correctly handle cases like '\''
+            if (c == '\\' && i + 1 < currentLine.length() && 
+                (state.inSingleQuote || state.inDoubleQuote)) {
+                char nextChar = currentLine.charAt(i + 1);
+                // Special case: \'' in single-quoted string, but only if there's another character after the second quote
+                // AND that character is not a closing parenthesis or semicolon (which would indicate end of SQL statement)
+                // This handles cases like '`~"\''\\' where \'' is followed by more string content
+                // But NOT cases like 'Quote:\'test\'' where \'' is at the end of the string value
+                if (state.inSingleQuote && nextChar == '\'' && i + 2 < currentLine.length() && 
+                    currentLine.charAt(i + 2) == '\'' && i + 3 < currentLine.length()) {
+                    char afterSecondQuote = currentLine.charAt(i + 3);
+                    // Only treat as special case if there's actual string content after \''
+                    // (not closing paren, semicolon, or whitespace that might indicate end)
+                    if (afterSecondQuote != ')' && afterSecondQuote != ';' && 
+                        (afterSecondQuote != ' ' || i + 4 < currentLine.length())) {
+                        // There's content after \'', so treat it as: \' (escaped quote) + ' (part of SQL-style '')
+                        // Skip \' and first ' of ''
+                        i += 2;
+                        continue;
+                    }
+                }
+                // Normal backslash escape: skip the escaped character
+                i++; // Skip the escaped character
                 continue;
             }
             
-            // Handle backslash escape - only valid inside the corresponding quote type
-            // Check this after SQL-style escape to avoid interfering with '' pattern
-            if (c == '\\' && i + 1 < currentLine.length() && 
-                (state.inSingleQuote || state.inDoubleQuote)) {
-                i++; // Skip the escaped character
+            // Handle SQL-style escaped single quote ('') - only valid inside single quote string
+            // Check this after backslash escape to avoid interfering with \' pattern
+            if (c == '\'' && state.inSingleQuote && i + 1 < currentLine.length() && 
+                currentLine.charAt(i + 1) == '\'') {
+                i++; // Skip the second quote
                 continue;
             }
             
@@ -415,19 +450,38 @@ public class ScriptParser {
         for (int i = 0; i < text.length(); i++) {
             char c = text.charAt(i);
             
-            // Handle SQL-style escaped single quote ('') first - only valid inside single quote string
-            // This must be checked before backslash escape to correctly handle cases like '\''
-            if (c == '\'' && state.inSingleQuote && i + 1 < text.length() && 
-                text.charAt(i + 1) == '\'') {
-                i++; // Skip the second quote
+            // Handle backslash escape first - only valid inside the corresponding quote type
+            // This must be checked before SQL-style escape to correctly handle cases like '\''
+            if (c == '\\' && i + 1 < text.length() && 
+                (state.inSingleQuote || state.inDoubleQuote)) {
+                char nextChar = text.charAt(i + 1);
+                // Special case: \'' in single-quoted string, but only if there's another character after the second quote
+                // AND that character is not a closing parenthesis or semicolon (which would indicate end of SQL statement)
+                // This handles cases like '`~"\''\\' where \'' is followed by more string content
+                // But NOT cases like 'Quote:\'test\'' where \'' is at the end of the string value
+                if (state.inSingleQuote && nextChar == '\'' && i + 2 < text.length() && 
+                    text.charAt(i + 2) == '\'' && i + 3 < text.length()) {
+                    char afterSecondQuote = text.charAt(i + 3);
+                    // Only treat as special case if there's actual string content after \''
+                    // (not closing paren, semicolon, or whitespace that might indicate end)
+                    if (afterSecondQuote != ')' && afterSecondQuote != ';' && 
+                        (afterSecondQuote != ' ' || i + 4 < text.length())) {
+                        // There's content after \'', so treat it as: \' (escaped quote) + ' (part of SQL-style '')
+                        // Skip \' and first ' of ''
+                        i += 2;
+                        continue;
+                    }
+                }
+                // Normal backslash escape: skip the escaped character
+                i++; // Skip the escaped character
                 continue;
             }
             
-            // Handle backslash escape - only valid inside the corresponding quote type
-            // Check this after SQL-style escape to avoid interfering with '' pattern
-            if (c == '\\' && i + 1 < text.length() && 
-                (state.inSingleQuote || state.inDoubleQuote)) {
-                i++; // Skip the escaped character
+            // Handle SQL-style escaped single quote ('') - only valid inside single quote string
+            // Check this after backslash escape to avoid interfering with \' pattern
+            if (c == '\'' && state.inSingleQuote && i + 1 < text.length() && 
+                text.charAt(i + 1) == '\'') {
+                i++; // Skip the second quote
                 continue;
             }
             

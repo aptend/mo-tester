@@ -1,26 +1,20 @@
 package io.mo.util;
 
-import junit.framework.TestCase;
-import junit.framework.TestSuite;
+import org.junit.Test;
+
+import static org.junit.Assert.*;
 
 /**
  * BaseConfigUtil 测试类
  * 通过测试实际的配置工具类来验证 BaseConfigUtil 的功能
  */
-public class BaseConfigUtilTest extends TestCase {
-    
-    public BaseConfigUtilTest(String testName) {
-        super(testName);
-    }
-    
-    public static junit.framework.Test suite() {
-        return new TestSuite(BaseConfigUtilTest.class);
-    }
+public class BaseConfigUtilTest {
     
     /**
      * 测试嵌套路径访问功能
      * 通过 RunConfUtil 来测试，因为它的配置结构简单
      */
+    @Test
     public void testNestedPathAccess() {
         // 测试简单的单层访问
         String path = RunConfUtil.getPath();
@@ -36,6 +30,7 @@ public class BaseConfigUtilTest extends TestCase {
     /**
      * 测试字符串分割功能
      */
+    @Test
     public void testSplitFunctionality() {
         String[] dbs = RunConfUtil.getBuiltinDb();
         assertNotNull("BuiltinDb should not be null", dbs);
@@ -51,6 +46,7 @@ public class BaseConfigUtilTest extends TestCase {
     /**
      * 测试整数获取功能
      */
+    @Test
     public void testIntegerAccess() {
         int rate = RunConfUtil.getRate();
         assertTrue("Rate should be positive", rate > 0);
@@ -64,6 +60,7 @@ public class BaseConfigUtilTest extends TestCase {
     /**
      * 测试 Map 访问功能
      */
+    @Test
     public void testMapAccess() {
         // 通过 MoConfUtil 测试深层 Map 访问
         String driver = MoConfUtil.getDriver();
@@ -77,6 +74,7 @@ public class BaseConfigUtilTest extends TestCase {
     /**
      * 测试深层嵌套访问
      */
+    @Test
     public void testDeepNestedAccess() {
         // 测试多层嵌套路径访问：jdbc -> database -> default
         String db = MoConfUtil.getDefaultDatabase();
@@ -90,6 +88,7 @@ public class BaseConfigUtilTest extends TestCase {
     /**
      * 测试空值处理
      */
+    @Test
     public void testNullHandling() {
         // 测试不存在路径的处理
         // 由于我们使用真实配置，这里主要验证不会抛出异常
@@ -105,6 +104,7 @@ public class BaseConfigUtilTest extends TestCase {
     /**
      * 测试配置一致性
      */
+    @Test
     public void testConfigurationConsistency() {
         // 多次访问应该返回相同结果
         String path1 = RunConfUtil.getPath();

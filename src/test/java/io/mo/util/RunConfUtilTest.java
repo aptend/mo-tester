@@ -1,47 +1,43 @@
 package io.mo.util;
 
-import junit.framework.TestCase;
-import junit.framework.TestSuite;
+import org.junit.Test;
 
-import io.mo.constant.COMMON;
+import static org.junit.Assert.*;
 
 /**
  * RunConfUtil 测试类
  */
-public class RunConfUtilTest extends TestCase {
+public class RunConfUtilTest {
     
-    public RunConfUtilTest(String testName) {
-        super(testName);
-    }
-    
-    public static junit.framework.Test suite() {
-        return new TestSuite(RunConfUtilTest.class);
-    }
-    
+    @Test
     public void testGetPath() {
         String path = RunConfUtil.getPath();
         assertNotNull("Path should not be null", path);
         assertEquals("cases/", path);
     }
     
+    @Test
     public void testGetMethod() {
         String method = RunConfUtil.getMethod();
         assertNotNull("Method should not be null", method);
         assertEquals("run", method);
     }
     
+    @Test
     public void testGetRate() {
         int rate = RunConfUtil.getRate();
         assertTrue("Rate should be positive", rate > 0);
         assertEquals(100, rate);
     }
     
+    @Test
     public void testGetWaitTime() {
         int waitTime = RunConfUtil.getWaitTime();
         assertTrue("WaitTime should be positive", waitTime > 0);
         assertEquals(2000, waitTime);
     }
     
+    @Test
     public void testGetBuiltinDb() {
         String[] dbs = RunConfUtil.getBuiltinDb();
         assertNotNull("BuiltinDb should not be null", dbs);
@@ -63,6 +59,7 @@ public class RunConfUtilTest extends TestCase {
         }
     }
     
+    @Test
     public void testGetOutFiles() {
         String[] outFiles = RunConfUtil.getOutFiles();
         assertNotNull("OutFiles should not be null", outFiles);
@@ -77,6 +74,7 @@ public class RunConfUtilTest extends TestCase {
     
 
     
+    @Test
     public void testConfigurationLoad() {
         // 测试所有配置项都能正常加载
         String path = RunConfUtil.getPath();
@@ -94,6 +92,7 @@ public class RunConfUtilTest extends TestCase {
         assertNotNull("OutFiles should be loaded", outFiles);
     }
     
+    @Test
     public void testGetBuiltinDbFormat() {
         String[] dbs = RunConfUtil.getBuiltinDb();
         assertNotNull(dbs);
@@ -105,6 +104,7 @@ public class RunConfUtilTest extends TestCase {
         }
     }
     
+    @Test
     public void testGetOutFilesFormat() {
         String[] outFiles = RunConfUtil.getOutFiles();
         assertNotNull(outFiles);
@@ -118,6 +118,7 @@ public class RunConfUtilTest extends TestCase {
     
 
     
+    @Test
     public void testAllConfigurations() {
         // 综合测试所有配置方法
         assertNotNull("Path", RunConfUtil.getPath());

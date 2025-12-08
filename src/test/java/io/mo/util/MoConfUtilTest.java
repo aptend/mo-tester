@@ -1,53 +1,52 @@
 package io.mo.util;
 
-import junit.framework.TestCase;
-import junit.framework.TestSuite;
+import org.junit.Test;
 
 import io.mo.constant.COMMON;
+
+import static org.junit.Assert.*;
 
 /**
  * MoConfUtil 测试类
  */
-public class MoConfUtilTest extends TestCase {
+public class MoConfUtilTest {
     
-    public MoConfUtilTest(String testName) {
-        super(testName);
-    }
-    
-    public static junit.framework.Test suite() {
-        return new TestSuite(MoConfUtilTest.class);
-    }
-    
+    @Test
     public void testGetDriver() {
         String driver = MoConfUtil.getDriver();
         assertNotNull("Driver should not be null", driver);
         assertEquals("com.mysql.cj.jdbc.Driver", driver);
     }
     
+    @Test
     public void testGetUserName() {
         String username = MoConfUtil.getUserName();
         assertNotNull("Username should not be null", username);
         assertEquals("dump", username);
     }
     
+    @Test
     public void testGetUserpwd() {
         String password = MoConfUtil.getUserpwd();
         assertNotNull("Password should not be null", password);
         assertEquals("111", password);
     }
     
+    @Test
     public void testGetSysUserName() {
         String sysUsername = MoConfUtil.getSysUserName();
         assertNotNull("SysUsername should not be null", sysUsername);
         assertEquals("dump", sysUsername);
     }
     
+    @Test
     public void testGetSyspwd() {
         String sysPassword = MoConfUtil.getSyspwd();
         assertNotNull("SysPassword should not be null", sysPassword);
         assertEquals("111", sysPassword);
     }
     
+    @Test
     public void testGetDefaultDatabase() {
         String db = MoConfUtil.getDefaultDatabase();
         assertNotNull("Database should not be null", db);
@@ -55,6 +54,7 @@ public class MoConfUtilTest extends TestCase {
         assertEquals("", db);
     }
     
+    @Test
     public void testGetSocketTimeout() {
         int timeout = MoConfUtil.getSocketTimeout();
         assertTrue("SocketTimeout should be positive", timeout > 0);
@@ -62,6 +62,7 @@ public class MoConfUtilTest extends TestCase {
         assertEquals(120000, timeout);
     }
     
+    @Test
     public void testGetSocketTimeoutWithDefault() {
         // 如果配置中没有 socketTimeout，应该返回默认值
         int timeout = MoConfUtil.getSocketTimeout();
@@ -70,6 +71,7 @@ public class MoConfUtilTest extends TestCase {
                    timeout >= COMMON.DEFAULT_MAX_EXECUTE_TIME || timeout == 120000);
     }
     
+    @Test
     public void testGetDebugServers() {
         String[] servers = MoConfUtil.getDebugServers();
         assertNotNull("Debug servers should not be null", servers);
@@ -77,12 +79,14 @@ public class MoConfUtilTest extends TestCase {
         assertEquals("127.0.0.1", servers[0]);
     }
     
+    @Test
     public void testGetDebugPort() {
         int port = MoConfUtil.getDebugPort();
         assertTrue("Debug port should be positive", port > 0);
         assertEquals(6060, port);
     }
     
+    @Test
     public void testGetURL() {
         String url = MoConfUtil.getURL();
         assertNotNull("URL should not be null", url);
@@ -100,6 +104,7 @@ public class MoConfUtilTest extends TestCase {
         assertTrue("Should contain characterSetResults", params.contains("characterSetResults"));
     }
     
+    @Test
     public void testGetURLStructure() {
         String url = MoConfUtil.getURL();
         assertNotNull(url);
@@ -115,6 +120,7 @@ public class MoConfUtilTest extends TestCase {
         assertTrue("Should have query parameters", url.contains("?"));
     }
     
+    @Test
     public void testConfigurationConsistency() {
         // 测试配置的一致性
         String driver = MoConfUtil.getDriver();
@@ -130,6 +136,7 @@ public class MoConfUtilTest extends TestCase {
         assertNotNull("URL should be generated", url);
     }
     
+    @Test
     public void testMultipleAccessConsistency() {
         // 多次访问应该返回相同结果（单例模式）
         String driver1 = MoConfUtil.getDriver();
