@@ -617,12 +617,13 @@ public class ScriptParserTest {
         assertNotNull("TestScript should not be null", testScript);
         assertTrue("Should have parsed commands", testScript.getTotalCmdCount() > 300);
 
-        // 解析 result 文件
-        ResultParser.parse(testScript);
+        // 加载期望结果文件
+        ParseResult parseResult = ResultParser.loadExpectedResultsFromFile(testScript);
         
         // 检查解析是否成功
-        if (!ResultParser.isSucceeded()) {
-            System.out.println("Failed to parse result file for: " + sqlFilePath);
+        if (parseResult.isFailure()) {
+            System.out.println("Failed to parse result file for: " + sqlFilePath + 
+                    ", error: " + parseResult.getErrorMessage());
             return;
         }
         

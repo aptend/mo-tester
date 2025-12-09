@@ -4,23 +4,19 @@ import io.mo.result.StmtResult;
 import io.mo.result.TestResult;
 import io.mo.util.MoConfUtil;
 
-import java.awt.image.AreaAveragingScaleFilter;
 import java.lang.StringBuffer;
 import java.util.ArrayList;
 
 public class SqlCommand {
 
-    private String id;
     private StringBuffer command;
     private boolean ignore = false;
-    private boolean error = false;
     private int conn_id = 0;
 
     private String useDB = null;
 
     private String conn_user = null;
     private String conn_pswd = null;
-    private String delimiter;
     private String issueNo = null;
 
     //column separator in result file for this command,can be 3 values:
@@ -32,9 +28,7 @@ public class SqlCommand {
     private String scriptFile;
     private int position = 0;
     private ArrayList<Integer> sortKeyIndexs = new ArrayList<>();
-    
     private ArrayList<String> syscmds = new ArrayList<>();
-    
     private ArrayList<Integer> ignoreColumns = new ArrayList<>();
 
     private TestResult testResult;
@@ -42,14 +36,9 @@ public class SqlCommand {
     private StmtResult actResult;
 
     private SqlCommand next;
-    
     private int sleeptime = 0;
-    
     private boolean needWait = false;
-
-    
     private int waitConnId = 0;
-    
     private String waitOperation = "commit";
 
     private boolean regularMatch = false;
@@ -63,10 +52,6 @@ public class SqlCommand {
         this.command.append(command);
     }
     
-    public void deleteCharAt(int len){
-        this.command.deleteCharAt(len);
-    }
-    
     public void addSysCMD(String cmd){
         this.syscmds.add(cmd);
     }
@@ -74,37 +59,11 @@ public class SqlCommand {
     public ArrayList<String> getSysCMDS(){
         return this.syscmds;
     }
-    
-    public int size(){
-        return this.command.length();
-    }
-    
-    public void trim(){
-        if(this.command.length() == 0)
-            return;
-        
-        if(this.command.charAt(this.command.length() - 1) == ' ' || 
-           this.command.charAt(this.command.length() - 1) == '\n'){
-           this.command.deleteCharAt(this.command.length() - 1);
-        }
-    }
-    
-    public String getId() {
-        return id;
-    }
-
-    public void setId(String id) {
-        this.id = id;
-    }
 
     public String getCommand() {
         if(command.length() == 0)
             return null;
         return command.toString();
-    }
-
-    public void setCommand(StringBuffer command) {
-        this.command = command;
     }
     
     public int getConn_id() {
@@ -137,24 +96,12 @@ public class SqlCommand {
         return testResult;
     }
 
-    public void setTestResult(TestResult testResult) {
-        this.testResult = testResult;
-    }
-
     public boolean isIgnore() {
         return ignore;
     }
 
     public void setIgnore(boolean ignore) {
         this.ignore = ignore;
-    }
-
-    public boolean isError() {
-        return error;
-    }
-
-    public void setError(boolean error) {
-        this.error = error;
     }
 
     public int getPosition() {
@@ -187,7 +134,9 @@ public class SqlCommand {
 
     public void setExpResult(StmtResult expResult) {
         this.expResult = expResult;
-        this.testResult.setExpResult(expResult.toString());
+        if(expResult != null) {
+            this.testResult.setExpResult(expResult.toString());
+        }
     }
     
     public StmtResult getActResult() {
@@ -196,7 +145,9 @@ public class SqlCommand {
 
     public void setActResult(StmtResult actResult) {
         this.actResult = actResult;
-        this.testResult.setActResult(actResult.toString());
+        if(actResult != null) {
+            this.testResult.setActResult(actResult.toString());
+        }
     }
 
     public boolean checkResult(){
@@ -220,7 +171,6 @@ public class SqlCommand {
         this.issueNo = issueNo;
     }
 
-
     public void setConn_user(String conn_user) {
         this.conn_user = conn_user;
     }
@@ -232,16 +182,13 @@ public class SqlCommand {
     public void sleep(){
         if(sleeptime == 0)
             return;
-        else {
-            try {
-                Thread.sleep(sleeptime*1000);
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
-            }
+        
+        try {
+            Thread.sleep(sleeptime * 1000);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
         }
     }
-
-
 
     public int getSleeptime() {
         return sleeptime;
@@ -251,8 +198,6 @@ public class SqlCommand {
         this.sleeptime = sleeptime;
     }
 
-
-
     public String getUseDB() {
         return useDB;
     }
@@ -260,8 +205,6 @@ public class SqlCommand {
     public void setUseDB(String useDB) {
         this.useDB = useDB;
     }
-
-
 
     public boolean isRegularMatch() {
         return regularMatch;

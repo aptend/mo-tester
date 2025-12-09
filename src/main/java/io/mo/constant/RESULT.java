@@ -26,8 +26,6 @@ public class RESULT {
     public static String RESULT_TYPE_ABNORMAL = "ABNORMAL";
     public static String RESULT_TYPE_IGNORED = "IGNORED";
 
-    public static String RESULT_EMPTY_VALUE = "{EMPTY}";
-
     public static String COLUMN_SEPARATOR_TABLE = "\t";
     public static String COLUMN_SEPARATOR_SPACE = "    ";
     public static String COLUMN_SEPARATOR_SYSTEM = "THIS_IS_MO_SERPARATOR";

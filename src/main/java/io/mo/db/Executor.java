@@ -7,6 +7,7 @@ import io.mo.constant.RESULT;
 import io.mo.result.RSSet;
 import io.mo.result.StmtResult;
 import io.mo.util.MoConfUtil;
+import io.mo.util.ParseResult;
 import io.mo.util.ResultParser;
 import org.apache.log4j.Logger;
 
@@ -38,12 +39,11 @@ public class Executor {
         Connection connection = ConnectionManager.getConnection();
         createTestDB(connection,script);
 
-        //parse the result file
-        ResultParser.reset();
-        ResultParser.parse(script);
+        //load expected results from result file
+        ParseResult parseResult = ResultParser.loadExpectedResultsFromFile(script);
 
         //if result file is parsed failed,return
-        if(!ResultParser.isSucceeded()) {
+        if(parseResult.isFailure()) {
             LOG.info("The script file["+script.getFileName()+"] has been executed" +
                     ", and cost: " + script.getDuration() +"s" +
                     ", total:" + script.getCommands().size() +
@@ -313,10 +313,9 @@ public class Executor {
         //so it need to parse the old result file first, and read the original result
         if(rsf.exists()){
             isUpdate = true;
-            ResultParser.reset();
-            ResultParser.parse(script);
+            ParseResult parseResult = ResultParser.loadExpectedResultsFromFile(script);
             //if result file is parsed failed,return
-            if(!ResultParser.isSucceeded()) {
+            if(parseResult.isFailure()) {
                 LOG.warn("The test file["+script.getFileName()+"] does not match its result file");
                 LOG.warn("The mo-tester will generate new result file for ["+script.getFileName()+"] ");
             }
@@ -478,12 +477,11 @@ public class Executor {
         }
         createTestDB(connection,script);
 
-        //parse the result file
-        ResultParser.reset();
-        ResultParser.parse(script);
+        //load expected results from result file
+        ParseResult parseResult = ResultParser.loadExpectedResultsFromFile(script);
 
         //if result file is parsed failed,return
-        if(!ResultParser.isSucceeded()) {
+        if(parseResult.isFailure()) {
             LOG.error("The result file for the script file["+script.getFileName()+"] has been updated failed.");
             return;
         }
