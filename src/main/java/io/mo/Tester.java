@@ -6,7 +6,6 @@ import io.mo.db.ConnectionManager;
 import io.mo.db.Debugger;
 import io.mo.db.Executor;
 import io.mo.result.TestReport;
-import io.mo.util.ResultParser;
 import io.mo.util.RunConfUtil;
 import io.mo.util.ScriptParser;
 import org.apache.log4j.Logger;
@@ -122,11 +121,6 @@ public class Tester {
                     COMMON.IS_COMPARE_META = false;
                 }
 
-                //get check info
-                if (arg.equalsIgnoreCase("check")) {
-                    method = "check";
-                }
-
                 //get pprof info
                 if (arg.equalsIgnoreCase("pprof")) {
                     COMMON.NEEDPPROF = true;
@@ -180,10 +174,6 @@ public class Tester {
             debug(file);
         }
 
-        if(method.equalsIgnoreCase("check")){
-            check(file);
-        }
-
         if(method.equalsIgnoreCase("genrs")){
             LOG.info("Now start to clean up databases and outfiles.");
             cleanDatabases();
@@ -195,8 +185,7 @@ public class Tester {
 
         if(!method.equalsIgnoreCase("genrs")
                 &&!method.equalsIgnoreCase("debug")
-                &&!method.equalsIgnoreCase("run")
-                &&!method.equalsIgnoreCase("check")){
+                &&!method.equalsIgnoreCase("run")){
             LOG.info("The method is ["+ method +"] can not been supported.Only[run,debug,genrs] can be supported.");
         }
 
@@ -274,25 +263,6 @@ public class Tester {
         assert fs != null;
         for (File f : fs) {
             debug(f);
-        }
-    }
-
-    public static void check(File file){
-        if(file.isFile()){
-            if(!(file.getName().endsWith(".sql") || file.getName().endsWith(".test"))) {
-                return;
-            }
-            if(isInclude(file.getPath())) {
-                ScriptParser parser = new ScriptParser();
-                TestScript script = parser.parseScript(file.getPath());
-                ResultParser.check(script);
-            }
-            return;
-        }
-        File[] fs = file.listFiles();
-        assert fs != null;
-        for (File f : fs) {
-            check(f);
         }
     }
 

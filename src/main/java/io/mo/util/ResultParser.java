@@ -160,64 +160,6 @@ public class ResultParser {
     }
 
     /**
-     * check whether test file matches result file
-     */
-    public static void check(TestScript script){
-        reset();
-        //check whether the result file exists
-        String rsFilePath = null;
-        File resFile;
-        rsFilePath = script.getFileName().replaceAll("\\.[A-Za-z]+",COMMON.R_FILE_SUFFIX);
-        resFile = new File(rsFilePath);
-        if(!resFile.exists()){
-            rsFilePath = script.getFileName().replaceFirst(COMMON.CASES_DIR,COMMON.RESULT_DIR).replaceAll("\\.[A-Za-z]+",COMMON.R_FILE_SUFFIX);
-            resFile = new File(rsFilePath);
-            if(!resFile.exists()){
-                LOG.warn("The result of the test script file["+rsFilePath+"] does not exists,please check and this test script file will be skipped.");
-                //set the test script file invalid
-                script.invalid();
-                succeeded = false;
-                return;
-            }
-        }
-
-        try {
-            lineReader = new BufferedReader(new InputStreamReader(new FileInputStream(rsFilePath)));
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
-            return;
-        }
-
-        //read result file
-        read();
-
-        for(int i = 0; i < script.getTotalCmdCount(); i++){
-            SqlCommand command = script.getCommands().get(i);
-            if(resultText.indexOf(command.getCommand()) != 0){
-                LOG.error("[Exceptional command]["+script.getFileName()+"]["+command.getPosition()+"]:"+command.getCommand().trim() + ",it does not exist in result file");
-                return;
-            }
-
-            int fromIndex = command.getCommand().length();
-
-            if(command.getNext() != null && resultText.indexOf(command.getNext().getCommand(),fromIndex) == -1){
-                LOG.error("[Exceptional command]["+script.getFileName()+"]["+command.getNext().getPosition()+"]:"+command.getNext().getCommand().trim() + ",it does not exist in result file");
-                return;
-            }
-
-            try {
-                getCommandResult(command);
-            } catch (Exception e) {
-                LOG.error("[Exceptional command]["+script.getFileName()+"]["+command.getPosition()+"]:"+command.getCommand().trim());
-                //set the test script file invalid
-                script.invalid();
-                succeeded = false;
-                return;
-            }
-        }
-    }
-
-    /**
      * convert the result text to a RSSet instance
      * @param separator column separator,can be 3 values:
      * 1、table,separator is \t

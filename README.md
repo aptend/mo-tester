@@ -83,7 +83,6 @@ If you'd like to adjust the test range, you can just change the `path` parameter
 | -e         |set the excluding list, and script files in the path whose name contains one of the lists will not be executed, if more than one, separated by `,`, if not specified, refers to none of the cases excluded|
 | -g         |means SQL commands which is marked with [bvt:issue] flag will not be executed,this flag starts with [-- @bvt:issue#{issueNO.}],and ends with [-- @bvt:issue],eg:<br>-- @bvt:issue#3236<br/><br>select date_add("1997-12-31 23:59:59",INTERVAL "-10000:1" HOUR_MINUTE);<br/><br>select date_add("1997-12-31 23:59:59",INTERVAL "-100 1" YEAR_MONTH);<br/><br>-- @bvt:issue<br/><br>Those two sql commands are associated with issue#3236, and they will not be executed in bvt test, until the flag is removed when issue#3236 is fixed.<br/>|
 | -n         |means the metadata of the resultset will be ignored when comparing the result|
-| -c         |only check whether the case file matches the related result file|
 | -s         |set the resource path that mo-tester use to store resources, and can be refered to  in test file|
 
 **Examples**:
